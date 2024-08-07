@@ -81,4 +81,3 @@ ax[1].plot(t, r[0, :], label='r')
 ax[2].plot(t, v[0, :], label='v')
 [x.legend() for x in ax]
 plt.show()
-
