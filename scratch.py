@@ -1,3 +1,4 @@
+#%% Import libraries and packages
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,12 +10,12 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.cluster.hierarchy import cophenet
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
-
+# %matplotlib qt
 '''
 TODO: Minor
 label plots and prep explanations
 '''
-
+#%% Define functions
 def simulate_network(n_cells, w, I, time_params):
 
     tau = time_params['tau']
@@ -49,6 +50,7 @@ def simulate_network(n_cells, w, I, time_params):
     # init v and u
     v[:, 0] = vr
 
+    # Simulate the network in order to identify the clusters
     for i in range(1, n):
 
         dt = t[i] - t[i - 1]
@@ -75,10 +77,89 @@ def simulate_network(n_cells, w, I, time_params):
                 v[jj, i] = c
                 u[jj, i] = u[jj, i] + d
                 spike[jj, i] = 1
+    '''            
+    # PERFORM THE CLUSTERING
+    # get spike times
+    spike_times = []
+    cmap = ['C0', 'C1', 'C2']
+    for i in range(spike.shape[0]):
+        spike_times.append(t[spike[i, :] == 1])
 
+    # compute covaraince matrix on output g
+    cormat_raw = np.corrcoef(g)
+
+    # k-means cluster cov matrix
+    # X = cormat_raw
+    # kmeans = KMeans(n_clusters=3).fit(X)
+    # cluster_labels = kmeans.labels_
+
+    # Agglomerative cluster cov matrix
+    X = cormat_raw
+    Z = linkage(X, method='ward', optimal_ordering=True)
+
+    c, coph_dists = cophenet(Z, pdist(X))
+    print(c)
+
+    R = dendrogram(
+        Z,
+        truncate_mode=None,
+        no_plot=True,
+    )
+
+    k = np.unique(R['color_list']).shape[0]
+    clusters = fcluster(Z, k, criterion='maxclust')
+    cluster_labels = clusters
+     
+    # print("Cluster labels: ", clusters)
+     
+    XX = np.zeros((k, X.shape[1]))
+    for i in range(k):
+        XX[i, :] = np.array([
+            X[clusters == i + 1, :].mean(axis=0),
+        ])
+    
+    # Run a modified version of the network that responds cluster specific 
+    for i in range(1, n):
+
+        dt = t[i] - t[i - 1]
+
+        # iterate through postsynaptic neurons
+        for jj in range(n_cells):
+
+            # iterate through presynaptic neurons
+            for kk in range(n_cells):
+                if jj != kk:
+                    I_net[jj, i - 1] += w[kk, jj] * g[kk, i - 1]
+
+            dvdt = (k * (v[jj, i - 1] - vr) * (v[jj, i - 1] - vt) -
+                    u[jj, i - 1] - I_net[jj, i - 1] + I[jj, i - 1]) / C
+            dudt = a * (b * (v[jj, i - 1] - vr) - u[jj, i - 1])
+            dgdt = (-g[jj, i - 1] + psp_amp * spike[jj, i - 1]) / psp_decay
+
+            v[jj, i] = v[jj, i - 1] + dvdt * dt
+            u[jj, i] = u[jj, i - 1] + dudt * dt
+            g[jj, i] = g[jj, i - 1] + dgdt * dt
+
+            if v[jj, i] >= vpeak:
+                v[jj, i - 1] = vpeak
+                v[jj, i] = c
+                u[jj, i] = u[jj, i] + d
+                spike[jj, i] = 1
+         
+        # Step 1: compute the average g output per cluster
+            # g from each neuron (timestep-by-timestep average)
+         
+        # Step 2: if a cluster's average g output is greater than a threshold, 
+        # then record a response for that cluster's response
+         
+    # Step 3: make a figure that show the time steps that each cluster made a response
+        # colour code cluster responses
+        # x = time step
+        # y = T/F , 1/0s
+    '''     
     return t, n, v, g, spike
 
-
+#%%
 def plot_results(t, n, v, g, spike):
 
     # get spike times
@@ -111,7 +192,9 @@ def plot_results(t, n, v, g, spike):
     k = np.unique(R['color_list']).shape[0]
     clusters = fcluster(Z, k, criterion='maxclust')
     cluster_labels = clusters
-
+    
+    # print("Cluster labels: ", clusters)
+    
     XX = np.zeros((k, X.shape[1]))
     for i in range(k):
         XX[i, :] = np.array([
@@ -168,12 +251,15 @@ def plot_results(t, n, v, g, spike):
         'spike': spike.flatten(),
         't': np.tile(t, n_cells)
     })
+    
+    # print(d)
+    return d
 
     dd = d.iloc[::100, :]
     sns.lineplot(data=dd, x='t', y='g', hue='neuron')
     plt.show()
-
-    # plot v and g coloured by cluster
+    '''
+    plot v and g coloured by cluster
     fig, ax = plt.subplots(n_cells, 2, squeeze=False)
     cmap = ['C0', 'C1', 'C2']
     for i in range(n_cells):
@@ -204,8 +290,9 @@ def plot_results(t, n, v, g, spike):
     ax[0, 0].set_xlim(0, t.max())
     ax[1, 0].set_xlim(0, t.max())
     plt.show()
+    '''
 
-
+#%% init
 tau = 0.1
 T = 5000
 t = np.arange(0, T, tau)
@@ -219,30 +306,56 @@ ibif = 340
 # NOTE: fixed input
 I = np.random.uniform(ibif, ibif + 1, (n_cells, 1))
 I = np.tile(I, n)
+'''
 # for i in range(I.shape[0]):
 #     plt.plot(t, I[i, :])
 # plt.show()
 
-# NOTE: fluctuating input (changes every 10 ms ~ 10 ms / tau ms / sample)
+## NOTE: fluctuating input (changes every 10 ms ~ 10 ms / tau ms / sample)
 # I = np.random.uniform(ibif, ibif + 1, (n_cells, int(10 / tau)))
 # I = np.repeat(I, n // I.shape[1], axis=1)
 # for i in range(I.shape[0]):
 #     plt.plot(t, I[i, :])
 # plt.show()
+'''
 
 ksyn = 2e3
 
-# NOTE: weakly interconnected
-p = 0.2
+#%% NOTE: weakly interconnected
+p = 0.2 #fixed probability
 w = np.random.uniform(0, 1, (n_cells, n_cells))
 w = (w < p).astype(int)
 eps = np.random.uniform(0.8, 1.2, (n_cells, n_cells))
 k = (ksyn / p) * eps
 w = w * k
 t, n, v, g, spike = simulate_network(n_cells, w, I, time_params)
-plot_results(t, n, v, g, spike)
 
-# NOTE: strongly interconnected
+d_weak = plot_results(t, n, v, g, spike)
+
+#%% set conditions: weakly interconnected (i.e. lever presses)
+'''WRONG APPROACH'''
+# Create new dataFrame n_clusters_weak with only neuron num and cluster num
+cols = ['neuron', 'cluster']
+neurons_to_clusters_weak = d_weak[cols]
+# Drop neuron duplicates
+singleNeurons_to_clusters_weak = neurons_to_clusters_weak.drop_duplicates(subset = "neuron")
+
+# Create list with only clusters without duplicates
+clustersOnly_weak = d_weak["cluster"]
+singleClusters_weak = clustersOnly_weak.drop_duplicates()
+
+# Assign different tasks to each cluster
+    # Create empty array for cluster numbers in order
+clusterNum = np.zeros(len(singleNeurons_to_clusters_weak))
+for i in range(len(singleNeurons_to_clusters_weak)): # i = neuron index
+    clusterNum[i] = singleNeurons_to_clusters_weak.iloc[i, 1] 
+    # Define tasks
+    task = np.arange(1,len(singleClusters_weak)+1, 1)
+    # taskNum = task[i]
+    
+print(clusterNum)
+
+#%% NOTE: strongly interconnected
 p = 0.95
 w = np.random.uniform(0, 1, (n_cells, n_cells))
 w = (w < p).astype(int)
@@ -250,4 +363,8 @@ eps = np.random.uniform(0.8, 1.2, (n_cells, n_cells))
 k = (ksyn / p) * eps
 w = w * k
 t, n, v, g, spike = simulate_network(n_cells, w, I, time_params)
-plot_results(t, n, v, g, spike)
+
+d_strong = plot_results(t, n, v, g, spike)
+
+#%% set conditions: strongly interconnected (i.e. lever presses)
+
