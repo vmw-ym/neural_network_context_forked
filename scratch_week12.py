@@ -2,7 +2,7 @@
 Tasks (24/10,Fri):
     1) Update weights at each trial to simulate learning
         [DONE] - Create trl loop
-        [started] - Adjust indentation (up to line 130)
+        [DONE] - Adjust indentation
         [currently clueless] - Tweak weight settings
     2) Check cortical input -> top-hat?
 '''
@@ -129,132 +129,132 @@ def simulate_network(n_cells, w, I, time_params):
                             u[jj, i] = u[jj, i] + d
                             spike[jj, i] = 1
     
-    # PERFORM THE CLUSTERING
-    # get spike times
-    spike_times = []
-    cmap = ['C0', 'C1', 'C2']
-    for i in range(spike.shape[0]):
-        spike_times.append(t[spike[i, :] == 1])
+        # PERFORM THE CLUSTERING
+        # get spike times
+        spike_times = []
+        cmap = ['C0', 'C1', 'C2']
+        for i in range(spike.shape[0]):
+            spike_times.append(t[spike[i, :] == 1])
 
-    # compute covaraince matrix on output g
-    cormat_raw = np.corrcoef(g)
-
-    # k-means cluster cov matrix
-    # X = cormat_raw
-    # kmeans = KMeans(n_clusters=3).fit(X)
-    # cluster_labels = kmeans.labels_
-
-    # Agglomerative cluster cov matrix
-    X = cormat_raw
-    Z = linkage(X, method='ward', optimal_ordering=True)
-
-    c, coph_dists = cophenet(Z, pdist(X))
-    print(c)
-
-    R = dendrogram(
-        Z,
-        truncate_mode=None,
-        no_plot=True,
-    )
-
-    k = np.unique(R['color_list']).shape[0]
-    clusters = fcluster(Z, k, criterion='maxclust') #request max number of clusters
-    cluster_labels = clusters
-     
-    print("Cluster labels: ", clusters)
+        # compute covaraince matrix on output g
+        cormat_raw = np.corrcoef(g)
+        
+        # k-means cluster cov matrix
+        # X = cormat_raw
+        # kmeans = KMeans(n_clusters=3).fit(X)
+        # cluster_labels = kmeans.labels_
+        
+        # Agglomerative cluster cov matrix
+        X = cormat_raw
+        Z = linkage(X, method='ward', optimal_ordering=True)
+        
+        c, coph_dists = cophenet(Z, pdist(X))
+        print(c)
+        
+        R = dendrogram(
+            Z,
+            truncate_mode=None,
+            no_plot=True,
+            )
+        
+        k = np.unique(R['color_list']).shape[0]
+        clusters = fcluster(Z, k, criterion='maxclust') #request max number of clusters
+        cluster_labels = clusters
+        
+        print("Cluster labels: ", clusters)
+        
+        clusterResp = np.zeros((np.unique(cluster_labels).shape[0], n))
+        
+        XX = np.zeros((k, X.shape[1]))
+        for i in range(k):
+            XX[i, :] = np.array([
+                X[clusters == i + 1, :].mean(axis=0),
+                ])
     
-    clusterResp = np.zeros((np.unique(cluster_labels).shape[0], n))
-     
-    XX = np.zeros((k, X.shape[1]))
-    for i in range(k):
-        XX[i, :] = np.array([
-            X[clusters == i + 1, :].mean(axis=0),
-        ])
-    
-    # RUN A MODIFIED VERSION OF THE NETWORK THAT RESPONDS CLUSTER SPECIFIC
-    for i in range(1, n):
-
-        dt = t[i] - t[i - 1]
-
-        # iterate through postsynaptic neurons
-        for jj in range(n_cells):
-
-            # iterate through presynaptic neurons
-            for kk in range(n_cells):
-                if jj != kk:
-                    I_net[jj, i - 1] += w[kk, jj] * g[kk, i - 1]
-
-            dvdt = (k * (v[jj, i - 1] - vr) * (v[jj, i - 1] - vt) -
-                    u[jj, i - 1] - I_net[jj, i - 1] + I[jj, i - 1]) / C
-            dudt = a * (b * (v[jj, i - 1] - vr) - u[jj, i - 1])
-            dgdt = (-g[jj, i - 1] + psp_amp * spike[jj, i - 1]) / psp_decay
-
-            v[jj, i] = v[jj, i - 1] + dvdt * dt
-            u[jj, i] = u[jj, i - 1] + dudt * dt
-            g[jj, i] = g[jj, i - 1] + dgdt * dt
-
-            if v[jj, i] >= vpeak:
-                v[jj, i - 1] = vpeak
-                v[jj, i] = c
-                u[jj, i] = u[jj, i] + d
-                spike[jj, i] = 1
-        
-        
-        # Step 1: compute the average g output per cluster
-            # g from each neuron (timestep-by-timestep average)
-        
-        # Go through each neuron represented in the cluster_labels array
-        for icl, cl in enumerate(np.unique(cluster_labels)): # icl = index when cl takes on value; cl = current cluster label
-            # print(icl, cl)
-            g_mean = g[cluster_labels == cl, i].mean()
-            # print(g_mean)
+        # RUN A MODIFIED VERSION OF THE NETWORK THAT RESPONDS CLUSTER SPECIFIC
+        for i in range(1, n):
             
-            # Step 2: if a cluster's average g output is greater than a threshold, 
-            # then record a response for that cluster's response
+            dt = t[i] - t[i - 1]
+            
+            # iterate through postsynaptic neurons
+            for jj in range(n_cells):
+                
+                # iterate through presynaptic neurons
+                for kk in range(n_cells):
+                    if jj != kk:
+                        I_net[jj, i - 1] += w[kk, jj] * g[kk, i - 1]
+                        
+                dvdt = (k * (v[jj, i - 1] - vr) * (v[jj, i - 1] - vt) -
+                        u[jj, i - 1] - I_net[jj, i - 1] + I[jj, i - 1]) / C
+                dudt = a * (b * (v[jj, i - 1] - vr) - u[jj, i - 1])
+                dgdt = (-g[jj, i - 1] + psp_amp * spike[jj, i - 1]) / psp_decay
+                
+                v[jj, i] = v[jj, i - 1] + dvdt * dt
+                u[jj, i] = u[jj, i - 1] + dudt * dt
+                g[jj, i] = g[jj, i - 1] + dgdt * dt
+                
+                if v[jj, i] >= vpeak:
+                    v[jj, i - 1] = vpeak
+                    v[jj, i] = c
+                    u[jj, i] = u[jj, i] + d
+                    spike[jj, i] = 1
+                    
+                    
+            # Step 1: compute the average g output per cluster
+                # g from each neuron (timestep-by-timestep average)
         
-            if g_mean > resp_thresh:
-                clusterResp[icl, i] = 1
+            # Go through each neuron represented in the cluster_labels array
+            for icl, cl in enumerate(np.unique(cluster_labels)): # icl = index when cl takes on value; cl = current cluster label
+                # print(icl, cl)
+                g_mean = g[cluster_labels == cl, i].mean()
+                # print(g_mean)
+                
+                # Step 2: if a cluster's average g output is greater than a threshold, 
+                # then record a response for that cluster's response
+                
+                if g_mean > resp_thresh:
+                    clusterResp[icl, i] = 1
+                    
+        # Step 3: make a figure that show the time steps that each cluster made a response
+        # colour code cluster responses
+        # x = time step
+        # y = T/F , 1/0s
         
-    # Step 3: make a figure that show the time steps that each cluster made a response
-    # colour code cluster responses
-    # x = time step
-    # y = T/F , 1/0s
-    
-    fig, ax = plt.subplots()
-    # for cr in range(clusterResp.shape[0]):    
-    for cr, cl in enumerate(np.unique(cluster_labels)):  # cr = index, cl = cluster label
-        # Plot the response for each cluster
-        ax.plot(t, 
-                clusterResp[cr, :], 
-                label = f'Cluster {cl}')
-    ax.set_title('Responses of each cluster overtime')
-    ax.legend()
-    plt.show()
-    
-    # Raster plot    
-    spike_times_per_cluster = []
-    unique_clusters = np.unique(cluster_labels)
-    
-    color_palette = sns.color_palette("husl", len(unique_clusters))  # Generates 'len(unique_clusters)' distinct colors
-    colors = color_palette[::-1]
-    
-    for cl in unique_clusters:
-        spike_times = t[clusterResp[cl - 1, :] == 1]  # Adjust index if cluster labels start at 1
-        spike_times_per_cluster.append(spike_times)
-    
-    spike_times_per_cluster = spike_times_per_cluster[::-1]
-    unique_clusters = unique_clusters[::-1]
-    
-    fig, ax = plt.subplots()
-    ax.eventplot(spike_times_per_cluster, orientation='horizontal', colors=colors, linelengths=0.3)
-    ax.set_xlabel('t')
-    ax.set_ylabel('Cluster number')
-    ax.set_yticks(range(len(unique_clusters)), [f'{int(cl)}' for cl in unique_clusters])
-    ax.set_title('Responses of each cluster overtime')
-    plt.tight_layout()
-    plt.show()
-    
-    return t, n, v, g, spike
+        fig, ax = plt.subplots()
+        # for cr in range(clusterResp.shape[0]):    
+        for cr, cl in enumerate(np.unique(cluster_labels)):  # cr = index, cl = cluster label
+            # Plot the response for each cluster
+            ax.plot(t, 
+                    clusterResp[cr, :], 
+                    label = f'Cluster {cl}')
+        ax.set_title('Responses of each cluster overtime')
+        ax.legend()
+        plt.show()
+        
+        # Raster plot    
+        spike_times_per_cluster = []
+        unique_clusters = np.unique(cluster_labels)
+        
+        color_palette = sns.color_palette("husl", len(unique_clusters))  # Generates 'len(unique_clusters)' distinct colors
+        colors = color_palette[::-1]
+        
+        for cl in unique_clusters:
+            spike_times = t[clusterResp[cl - 1, :] == 1]  # Adjust index if cluster labels start at 1
+            spike_times_per_cluster.append(spike_times)
+            
+        spike_times_per_cluster = spike_times_per_cluster[::-1]
+        unique_clusters = unique_clusters[::-1]
+        
+        fig, ax = plt.subplots()
+        ax.eventplot(spike_times_per_cluster, orientation='horizontal', colors=colors, linelengths=0.3)
+        ax.set_xlabel('t')
+        ax.set_ylabel('Cluster number')
+        ax.set_yticks(range(len(unique_clusters)), [f'{int(cl)}' for cl in unique_clusters])
+        ax.set_title('Responses of each cluster overtime')
+        plt.tight_layout()
+        plt.show()
+        
+        return t, n, v, g, spike
 
 #%%
 def plot_results(t, n, v, g, spike):
