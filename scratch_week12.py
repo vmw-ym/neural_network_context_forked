@@ -3,9 +3,42 @@ Tasks (24/10,Fri):
     1) Update weights at each trial to simulate learning
         [DONE] - Create trl loop
         [DONE] - Adjust indentation
-        [currently clueless] - Tweak weight settings
-            - Learning chunk pasted from tmp_hw4.py: See Lines 248-276
-    2) Check cortical input -> top-hat?
+        [InProgress_stuck] - Tweak weight settings 
+            - See following comment chunk (new variables initialised at top of function)
+    2) Cortical input -> top-hat?
+'''
+
+'''
+# Where within the nested for-loops should I put this?
+        
+        motor_activity[trl] = g[-1, :].sum()
+        if motor_activity[trl] > resp_thresh:
+            response[trl] = 1
+        elif np.random.rand() < 0.3:
+            response[trl] = 1
+            
+        if trl < n_trials // 3:
+            if response[trl] == 1:
+                if np.random.rand() < 1:
+                    obtained_reward[trl] = 1
+        elif trl >= n_trials // 3 and trl < 2 * n_trials // 3:
+            obtained_reward[trl] = 0
+        else:
+            if response[trl] == 1:
+                if np.random.rand() < 1:
+                    obtained_reward[trl] = 1
+
+        predicted_reward[trl] = predicted_reward[trl - 1] + alpha_pr * delta[trl - 1]
+        delta[trl] = obtained_reward[trl] - predicted_reward[trl]
+
+        pre = g[0, :].sum()
+        post = g[1, :].sum()
+        if delta[trl] > 0:
+            w[0, 1] += alpha * pre * post * delta[trl] * (1 - w[0, 1])
+        else:
+            w[0, 1] += alpha * pre * post * delta[trl] * w[0, 1]
+
+        w_rec[trl] = w[0, 1]
 '''
 
 #%% Import libraries and packages
@@ -71,6 +104,16 @@ def simulate_network(n_cells, w, I, time_params):
     u = np.zeros((n_cells, n))
     g = np.zeros((n_cells, n))
     spike = np.zeros((n_cells, n))
+    
+    motor_activity = np.zeros(n_trials)
+    w_rec = np.zeros(n_trials)
+    w_rec[0] = w[0, 1]
+    obtained_reward = np.zeros(n_trials)
+    predicted_reward = np.zeros(n_trials)
+    alpha = 8e-15
+    alpha_pr = 0.05
+    delta = np.zeros(n_trials)
+    response = np.zeros(n_trials)
     
     resp_thresh = 5e-4
     # resp_thresh = 4e-4
@@ -244,36 +287,6 @@ def simulate_network(n_cells, w, I, time_params):
             
         spike_times_per_cluster = spike_times_per_cluster[::-1]
         unique_clusters = unique_clusters[::-1]
-        
-        motor_activity[trl] = g[-1, :].sum()
-        if motor_activity[trl] > resp_thresh:
-            response[trl] = 1
-        elif np.random.rand() < 0.3:
-            response[trl] = 1
-
-        if trl < n_trials // 3:
-            if response[trl] == 1:
-                if np.random.rand() < 1:
-                    obtained_reward[trl] = 1
-        elif trl >= n_trials // 3 and trl < 2 * n_trials // 3:
-            obtained_reward[trl] = 0
-        else:
-            if response[trl] == 1:
-                if np.random.rand() < 1:
-                    obtained_reward[trl] = 1
-
-        predicted_reward[trl] = predicted_reward[trl -
-                                                 1] + alpha_pr * delta[trl - 1]
-        delta[trl] = obtained_reward[trl] - predicted_reward[trl]
-
-        pre = g[0, :].sum()
-        post = g[1, :].sum()
-        if delta[trl] > 0:
-            w[0, 1] += alpha * pre * post * delta[trl] * (1 - w[0, 1])
-        else:
-            w[0, 1] += alpha * pre * post * delta[trl] * w[0, 1]
-
-        w_rec[trl] = w[0, 1]
         
         fig, ax = plt.subplots()
         ax.eventplot(spike_times_per_cluster, orientation='horizontal', colors=colors, linelengths=0.3)
